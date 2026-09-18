@@ -2,14 +2,31 @@
 
 Trip planning agent built on the [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/python).
 
-**v1 (this)**: a single agent with `WebSearch` / `WebFetch` / `Write` tools that
-gathers trip requirements, researches flights/hotels/attractions, and writes a
-full day-by-day itinerary to `output/`.
+**v2 (this)**: an orchestrator + three specialist subagents, wired via
+`ClaudeAgentOptions.agents` and the SDK's built-in `Agent` tool:
 
-**Planned iteration**: split into an orchestrator + subagents (flight-search,
-hotel-search, attractions, itinerary-writer) using `ClaudeAgentOptions.agents`,
-so each concern can be tuned/tested independently. `agent.py` is kept separate
-from `cli.py` for exactly this reason — the transport layer shouldn't need to
+```
+                    You
+                     │
+              Orchestrator (gathers requirements,
+              delegates, synthesizes, writes file)
+                     │
+        ┌────────────┼────────────┐
+        ▼             ▼            ▼
+  flight-search  hotel-search  attractions-search
+  (WebSearch/     (WebSearch/    (WebSearch/
+   WebFetch)       WebFetch)      WebFetch)
+```
+
+The orchestrator has no web tools of its own — it must delegate research to
+the three subagents (run in parallel), then combines their findings into a
+day-by-day itinerary and writes it to `output/`.
+
+**v1** was a single agent doing everything directly — see git history. Each
+subagent's behavior lives in its own prompt in `prompts.py` / `AgentDefinition`
+in `agent.py`, so flight/hotel/attractions logic can be tuned independently
+without touching the others. `agent.py` stays separate from `cli.py` so the
+transport layer (interactive chat today, maybe an API later) doesn't need to
 change when the agent topology does.
 
 ## Setup

@@ -12,7 +12,13 @@ from .agent import build_options
 
 def _tool_summary(block: ToolUseBlock) -> str:
     payload = block.input or {}
-    return payload.get("query") or payload.get("url") or payload.get("file_path") or ""
+    return (
+        payload.get("query")
+        or payload.get("url")
+        or payload.get("file_path")
+        or payload.get("subagent_type")
+        or ""
+    )
 
 
 async def run() -> None:
@@ -51,15 +57,32 @@ async def run() -> None:
             await client.query(user_input)
             print("\nAgent: ", end="", flush=True)
 
+            subagent_names: dict[str, str] = {}
+
             async for message in client.receive_response():
                 if isinstance(message, AssistantMessage):
+                    in_subagent = getattr(message, "parent_tool_use_id", None)
+                    subagent = subagent_names.get(in_subagent, "subagent") if in_subagent else None
+
                     for block in message.content:
                         if isinstance(block, TextBlock):
-                            print(block.text, end="", flush=True)
+                            if subagent:
+                                print(f"\n  [{subagent}] {block.text}", end="", flush=True)
+                            else:
+                                print(block.text, end="", flush=True)
                         elif isinstance(block, ToolUseBlock):
-                            summary = _tool_summary(block)
-                            suffix = f": {summary}" if summary else ""
-                            print(f"\n  [{block.name}{suffix}]", flush=True)
+                            if block.name in ("Agent", "Task"):
+                                name = (block.input or {}).get("subagent_type", "subagent")
+                                subagent_names[block.id] = name
+                                print(f"\n  [delegating -> {name}]", flush=True)
+                            elif subagent:
+                                summary = _tool_summary(block)
+                                suffix = f": {summary}" if summary else ""
+                                print(f"\n    [{subagent}/{block.name}{suffix}]", flush=True)
+                            else:
+                                summary = _tool_summary(block)
+                                suffix = f": {summary}" if summary else ""
+                                print(f"\n  [{block.name}{suffix}]", flush=True)
 
             print("\n")
 
