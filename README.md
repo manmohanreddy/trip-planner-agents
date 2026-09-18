@@ -2,32 +2,44 @@
 
 Trip planning agent built on the [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/python).
 
-**v2 (this)**: an orchestrator + three specialist subagents, wired via
-`ClaudeAgentOptions.agents` and the SDK's built-in `Agent` tool:
+**v3 (this)**: explicit Python-level orchestration — four independent
+`query()` calls, fanned out and sequenced by our own code
+(`orchestrator.py`), not by an LLM deciding when to delegate:
 
 ```
                     You
                      │
-              Orchestrator (gathers requirements,
-              delegates, synthesizes, writes file)
+            Intake (chat, no tools —
+          gathers requirements, emits
+             a "READY:" trip brief)
                      │
+                     │  orchestrator.py: asyncio.gather(...)
         ┌────────────┼────────────┐
         ▼             ▼            ▼
   flight-search  hotel-search  attractions-search
   (WebSearch/     (WebSearch/    (WebSearch/
    WebFetch)       WebFetch)      WebFetch)
+        │             │            │
+        └─────────────┼────────────┘
+                       ▼
+                  Synthesis
+           (combines findings, writes
+            output/<dest>-itinerary.md)
 ```
 
-The orchestrator has no web tools of its own — it must delegate research to
-the three subagents (run in parallel), then combines their findings into a
-day-by-day itinerary and writes it to `output/`.
+Each stage is a plain `ClaudeAgentOptions` builder in `agent.py` and a
+`query()` call in `orchestrator.py`/`cli.py` — there's no `Agent` tool, no
+`ClaudeAgentOptions.agents`, no model-driven delegation. Parallelism between
+the three research specialists is `asyncio.gather`, guaranteed by code.
 
-**v1** was a single agent doing everything directly — see git history. Each
-subagent's behavior lives in its own prompt in `prompts.py` / `AgentDefinition`
-in `agent.py`, so flight/hotel/attractions logic can be tuned independently
-without touching the others. `agent.py` stays separate from `cli.py` so the
-transport layer (interactive chat today, maybe an API later) doesn't need to
-change when the agent topology does.
+**Earlier iterations** (single agent doing everything directly, then an
+orchestrator delegating via the SDK's `Agent` tool) are in git history. The
+Agent-tool version worked, but delegation timing (parallel vs. sequential,
+foreground vs. background) was steered by prompt instructions the model
+could deviate from — this version makes those decisions in Python instead.
+
+`agent.py` stays separate from `cli.py`/`orchestrator.py` so the transport
+layer doesn't need to change when the agent topology does.
 
 ## Setup
 
@@ -38,6 +50,9 @@ python -m venv .venv
 pip install -e .
 copy .env.example .env        # then fill in ANTHROPIC_API_KEY
 ```
+
+If `ANTHROPIC_API_KEY` is left unset, it falls back to your `claude` CLI's
+own login session instead.
 
 ## Run
 
@@ -53,8 +68,9 @@ It will ask for anything missing, research live, and save the itinerary to
 
 ```
 trip_planner/
-  agent.py    # ClaudeAgentOptions — model, tools, system prompt wiring
-  prompts.py  # system prompt (the actual "trip planner" behavior spec)
-  cli.py      # interactive terminal chat loop
-output/       # generated itineraries land here (gitignored)
+  agent.py         # ClaudeAgentOptions builders, one per stage/role
+  prompts.py        # each stage's system prompt
+  orchestrator.py    # fan-out (asyncio.gather) + synthesis — the actual orchestration
+  cli.py             # interactive intake chat, then runs the pipeline
+output/              # generated itineraries land here (gitignored)
 ```

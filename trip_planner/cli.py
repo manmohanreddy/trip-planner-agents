@@ -1,24 +1,53 @@
-"""Interactive CLI for the trip planner agent."""
+"""Interactive CLI: chat-based intake, then explicit Python-orchestrated
+research + synthesis (see orchestrator.py) — no SDK Agent-tool delegation.
+"""
 
 import asyncio
 import os
 import sys
 
-from claude_agent_sdk import AssistantMessage, ClaudeSDKClient, TextBlock, ToolUseBlock
+from claude_agent_sdk import AssistantMessage, ClaudeSDKClient, TextBlock
 from dotenv import load_dotenv
 
-from .agent import build_options
+from .agent import intake_options
+from .orchestrator import plan_trip
+
+READY_PREFIX = "READY:"
 
 
-def _tool_summary(block: ToolUseBlock) -> str:
-    payload = block.input or {}
-    return (
-        payload.get("query")
-        or payload.get("url")
-        or payload.get("file_path")
-        or payload.get("subagent_type")
-        or ""
-    )
+async def gather_requirements() -> str | None:
+    """Chat with the user until intake emits a READY: brief. None = user quit."""
+    async with ClaudeSDKClient(options=intake_options()) as client:
+        while True:
+            try:
+                user_input = input("You: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return None
+
+            if not user_input:
+                continue
+            if user_input.lower() in {"exit", "quit"}:
+                return None
+
+            await client.query(user_input)
+
+            full_text = ""
+            async for message in client.receive_response():
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            full_text += block.text
+
+            stripped = full_text.strip()
+            if stripped.startswith(READY_PREFIX):
+                return stripped[len(READY_PREFIX):].strip()
+
+            print(f"\nAgent: {full_text}\n")
+
+
+def _print_progress(label: str, detail: str) -> None:
+    print(f"  [{label}] {detail}", flush=True)
 
 
 async def run() -> None:
@@ -41,50 +70,15 @@ async def run() -> None:
 
     print("Trip Planner Agent. Describe the trip you want. Type 'exit' to quit.\n")
 
-    async with ClaudeSDKClient(options=build_options()) as client:
-        while True:
-            try:
-                user_input = input("You: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print()
-                break
+    while True:
+        brief = await gather_requirements()
+        if brief is None:
+            break
 
-            if not user_input:
-                continue
-            if user_input.lower() in {"exit", "quit"}:
-                break
-
-            await client.query(user_input)
-            print("\nAgent: ", end="", flush=True)
-
-            subagent_names: dict[str, str] = {}
-
-            async for message in client.receive_response():
-                if isinstance(message, AssistantMessage):
-                    in_subagent = getattr(message, "parent_tool_use_id", None)
-                    subagent = subagent_names.get(in_subagent, "subagent") if in_subagent else None
-
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            if subagent:
-                                print(f"\n  [{subagent}] {block.text}", end="", flush=True)
-                            else:
-                                print(block.text, end="", flush=True)
-                        elif isinstance(block, ToolUseBlock):
-                            if block.name in ("Agent", "Task"):
-                                name = (block.input or {}).get("subagent_type", "subagent")
-                                subagent_names[block.id] = name
-                                print(f"\n  [delegating -> {name}]", flush=True)
-                            elif subagent:
-                                summary = _tool_summary(block)
-                                suffix = f": {summary}" if summary else ""
-                                print(f"\n    [{subagent}/{block.name}{suffix}]", flush=True)
-                            else:
-                                summary = _tool_summary(block)
-                                suffix = f": {summary}" if summary else ""
-                                print(f"\n  [{block.name}{suffix}]", flush=True)
-
-            print("\n")
+        print("\nAll set. Researching flights, hotels, and attractions in parallel...\n")
+        itinerary = await plan_trip(brief, on_progress=_print_progress)
+        print(f"\n{itinerary}\n")
+        print("Ask about another trip, or type 'exit' to quit.\n")
 
 
 def main() -> None:
