@@ -58,13 +58,13 @@ class RunMetrics:
                 f"{s.num_turns or 0:2d} turns  {cost}{flag}"
             )
         lines.append(
-            f"  {'TOTAL':<12} {self.total_wall_seconds:6.2f}s wall  "
-            f"${self.total_cost_usd:.4f}"
+            f"  {'TOTAL':<12} {self.total_wall_seconds:6.2f}s wall  ${self.total_cost_usd:.4f}"
         )
         return lines
 
-    def write_log(self) -> None:
-        METRICS_LOG.parent.mkdir(parents=True, exist_ok=True)
+    def write_log(self, output_dir: Path | None = None) -> None:
+        log_path = Path(output_dir) / "metrics.jsonl" if output_dir else METRICS_LOG
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         record = {
             "ts": time.time(),
             "trip_brief": self.trip_brief,
@@ -72,5 +72,5 @@ class RunMetrics:
             "total_cost_usd": round(self.total_cost_usd, 6),
             "stages": [asdict(s) for s in self.stages],
         }
-        with METRICS_LOG.open("a", encoding="utf-8") as f:
+        with log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")

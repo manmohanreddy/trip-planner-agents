@@ -9,6 +9,7 @@ is controlled in code, not left to the model to decide via prompt.
 
 from claude_agent_sdk import ClaudeAgentOptions
 
+from .config import Settings
 from .prompts import (
     ATTRACTIONS_AGENT_PROMPT,
     FLIGHT_AGENT_PROMPT,
@@ -17,55 +18,63 @@ from .prompts import (
     SYNTHESIS_PROMPT,
 )
 
-DEFAULT_MODEL = "sonnet"
 
-
-def intake_options(model: str = DEFAULT_MODEL) -> ClaudeAgentOptions:
+def intake_options(settings: Settings | None = None) -> ClaudeAgentOptions:
     """Conversational requirement-gathering only — no tools."""
+    settings = settings or Settings()
     return ClaudeAgentOptions(
         system_prompt=INTAKE_PROMPT,
-        model=model,
+        model=settings.model,
         allowed_tools=[],
         permission_mode="acceptEdits",
         setting_sources=[],
+        max_budget_usd=settings.stage_budget_usd,
     )
 
 
-def flight_options(model: str = DEFAULT_MODEL) -> ClaudeAgentOptions:
+def flight_options(settings: Settings | None = None) -> ClaudeAgentOptions:
+    settings = settings or Settings()
     return ClaudeAgentOptions(
         system_prompt=FLIGHT_AGENT_PROMPT,
-        model=model,
+        model=settings.model,
         allowed_tools=["WebSearch", "WebFetch"],
         permission_mode="acceptEdits",
         setting_sources=[],
+        max_budget_usd=settings.stage_budget_usd,
     )
 
 
-def hotel_options(model: str = DEFAULT_MODEL) -> ClaudeAgentOptions:
+def hotel_options(settings: Settings | None = None) -> ClaudeAgentOptions:
+    settings = settings or Settings()
     return ClaudeAgentOptions(
         system_prompt=HOTEL_AGENT_PROMPT,
-        model=model,
+        model=settings.model,
         allowed_tools=["WebSearch", "WebFetch"],
         permission_mode="acceptEdits",
         setting_sources=[],
+        max_budget_usd=settings.stage_budget_usd,
     )
 
 
-def attractions_options(model: str = DEFAULT_MODEL) -> ClaudeAgentOptions:
+def attractions_options(settings: Settings | None = None) -> ClaudeAgentOptions:
+    settings = settings or Settings()
     return ClaudeAgentOptions(
         system_prompt=ATTRACTIONS_AGENT_PROMPT,
-        model=model,
+        model=settings.model,
         allowed_tools=["WebSearch", "WebFetch"],
         permission_mode="acceptEdits",
         setting_sources=[],
+        max_budget_usd=settings.stage_budget_usd,
     )
 
 
-def synthesis_options(model: str = DEFAULT_MODEL) -> ClaudeAgentOptions:
+def synthesis_options(settings: Settings | None = None) -> ClaudeAgentOptions:
+    settings = settings or Settings()
     return ClaudeAgentOptions(
         system_prompt=SYNTHESIS_PROMPT,
-        model=model,
+        model=settings.model,
         allowed_tools=["Write"],
         permission_mode="acceptEdits",
         setting_sources=[],
+        max_budget_usd=settings.stage_budget_usd,
     )

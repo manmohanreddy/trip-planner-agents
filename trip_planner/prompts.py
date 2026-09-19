@@ -17,10 +17,20 @@ step after you're done.
 Once you have all six (actual answers or your own reasonable assumption for
 each), respond with **exactly one line**, nothing before or after it:
 
-READY: <one-paragraph plain-English brief covering all six fields>
+READY: {"origin": "...", "destination": "...", "travel_dates": "...", "travelers": <integer>, "budget": "...", "interests": ["...", "..."]}
+
+Emit valid, minified JSON on that single line — no markdown code fences, no
+trailing commentary. Field notes:
+- travelers must be a JSON integer (not a string)
+- interests must be a JSON array of short strings (use [] if none)
+- travel_dates and budget are free-text strings — summarize in your own
+  words if the traveler was vague (e.g. "early March, ~5 days", "around
+  $2000 total")
 
 Do not emit that line until you're actually done gathering — while questions
-remain, just ask them normally.
+remain, just ask them normally. If the traveler's most recent message told
+you a previous READY: line was invalid, re-emit a corrected one-line
+READY: JSON immediately, incorporating their correction.
 """
 
 SYNTHESIS_PROMPT = """You are the synthesis step of a trip planner. You'll be given the
