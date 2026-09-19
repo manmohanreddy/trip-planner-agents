@@ -76,9 +76,11 @@ async def run() -> None:
             break
 
         print("\nAll set. Researching flights, hotels, and attractions in parallel...\n")
-        itinerary = await plan_trip(brief, on_progress=_print_progress)
+        itinerary, metrics = await plan_trip(brief, on_progress=_print_progress)
         print(f"\n{itinerary}\n")
-        print("Ask about another trip, or type 'exit' to quit.\n")
+        print("\n".join(metrics.summary_lines()))
+        print("\n(Full metrics appended to output/metrics.jsonl)")
+        print("\nAsk about another trip, or type 'exit' to quit.\n")
 
 
 def main() -> None:

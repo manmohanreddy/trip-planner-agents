@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 .env
 output/*.md
+output/*.jsonl
 !output/.gitkeep
 *.egg-info/
